@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视频号数据工作台</title>
+<script src="echarts.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f4f1;
+    --card: #ffffff;
+    --ink: #2b2b28;
+    --muted: #8a8a82;
+    --line: #e6e6e0;
+    --c-jj: #4a7fa5;
+    --c-jj-l: #a8c4d6;
+    --c-tx: #5a9a8b;
+    --c-tx-l: #b2d0c9;
+    --c-spx: #c08a52;
+    --c-spx-l: #e0c7a8;
+    --up: #b4544a;
+    --down: #5a8a6a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink);
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 28px 60px; }
+  header.top { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  .updated { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  nav.tabs { display: flex; gap: 6px; background: #e9e9e4; padding: 4px; border-radius: 10px; }
+  nav.tabs button {
+    border: none; background: transparent; padding: 8px 18px; border-radius: 8px;
+    font-size: 14px; color: var(--muted); cursor: pointer; transition: all .15s;
+  }
+  nav.tabs button.active { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .page { display: none; }
+  .page.active { display: block; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 16px;
+  }
+  .card h3 { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .section-title { font-size: 16px; font-weight: 700; margin: 28px 0 12px; }
+  .chart { width: 100%; height: 300px; }
+  .chart-tall { height: 360px; }
+
+  /* 总览：一账号一整行 */
+  .ov-row { display: grid; grid-template-columns: 240px 1fr 300px; gap: 28px; align-items: start; }
+  @media (max-width: 900px) { .ov-row { grid-template-columns: 1fr; } }
+  .ov-name { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .ov-followers { font-size: 38px; font-weight: 800; line-height: 1.1; }
+  .ov-asof { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .spark { height: 72px; margin-top: 14px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 20px; }
+  .kpi .label { font-size: 12px; color: var(--muted); }
+  .kpi .value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+  .kpi .value.small { font-size: 18px; }
+  .kpi .sub { font-size: 12px; margin-top: 2px; color: var(--muted); }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .progress-track { background: #eeeeea; border-radius: 99px; height: 10px; overflow: hidden; margin: 10px 0 6px; }
+  .progress-fill { height: 100%; border-radius: 99px; }
+  .goal-num { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .goal-num b { color: var(--ink); font-size: 13px; }
+  .goal-block { border-left: 1px solid var(--line); padding-left: 24px; }
+  @media (max-width: 900px) { .goal-block { border-left: none; padding-left: 0; } }
+  .goal-block h4 { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+
+  table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data th { text-align: left; color: var(--muted); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.data td { padding: 8px 10px; border-bottom: 1px solid #f0f0eb; }
+  table.data td.title-cell { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 99px; background: #f0f0ea; color: var(--muted); }
+
+  .placeholder-card { border: 1px dashed #cfcfc6; background: #fafaf7; }
+  .placeholder-card .value { color: #b9b9b0; }
+  .goal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .goal-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .goal-grid, .goal-grid-2 { grid-template-columns: 1fr; } }
+  .goal-grid .card, .goal-grid-2 .card { margin-bottom: 0; }
+  .todo-list { list-style: none; }
+  .todo-list li { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid #f0f0eb; font-size: 14px; }
+  .todo-list li:last-child { border-bottom: none; }
+  .todo-box { width: 16px; height: 16px; border: 1.5px solid #c5c5bc; border-radius: 4px; flex-shrink: 0; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .live-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .live-kpis { grid-template-columns: repeat(2, 1fr); } }
+  .live-kpis .card { margin-bottom: 0; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>视频号数据工作台</h1>
+      <div class="updated" id="updatedAt"></div>
+    </div>
+    <nav class="tabs">
+      <button data-page="overview" class="active">总览</button>
+      <button data-page="weekly">单周数据</button>
+      <button data-page="history">历史趋势</button>
+      <button data-page="hot">爆款视频</button>
+      <button data-page="live">直播</button>
+      <button data-page="goals">目标与待办</button>
+    </nav>
+  </header>
+
+  <!-- 总览 -->
+  <section class="page active" id="page-overview"></section>
+
+  <!-- 单周数据 -->
+  <section class="page" id="page-weekly">
+    <div class="section-title" id="weeklyRange"></div>
+    <div id="weeklyCharts"></div>
+    <div class="section-title">本周视频明细 <span class="tag" id="videoSrcTag"></span></div>
+    <div id="weeklyVideos"></div>
+  </section>
+
+  <!-- 历史趋势 -->
+  <section class="page" id="page-history">
+    <div class="section-title">月新增关注（近 12 个月 · 下段=视频新增 / 上段=直播间新增）</div>
+    <div id="mfCharts"></div>
+    <div class="section-title">月日均播放（近 12 个月）</div>
+    <div id="mpCharts"></div>
+    <div class="section-title">粉丝总量累计曲线（近两年）</div>
+    <div class="card">
+      <h3>粉丝总量 <button id="logToggle" style="margin-left:auto;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;color:var(--muted)">切换对数刻度</button></h3>
+      <div id="followerHist" class="chart chart-tall"></div>
+    </div>
+  </section>
+
+  <!-- 爆款视频 -->
+  <section class="page" id="page-hot"></section>
+
+  <!-- 直播 -->
+  <section class="page" id="page-live"></section>
+
+  <!-- 目标与待办 -->
+  <section class="page" id="page-goals">
+    <div class="section-title">年度粉丝目标</div>
+    <div class="goal-grid" id="goalCards"></div>
+    <div class="section-title">年度总播放目标 <span class="tag">口径：历史总表每日播放当年求和</span></div>
+    <div class="goal-grid" id="playGoalCards"></div>
+    <div class="section-title">月日均播放目标（待设定）</div>
+    <div class="goal-grid-2">
+      <div class="card placeholder-card">
+        <h3>月日均播放目标</h3>
+        <div class="kpi"><div class="value">待定</div><div class="sub">目标值设定后自动计算进度</div></div>
+      </div>
+    </div>
+    <div class="section-title">本周待办</div>
+    <div class="card">
+      <ul class="todo-list" id="todoList"></ul>
+      <div class="note">待办于每周一随数据一同更新</div>
+    </div>
+  </section>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.DASHBOARD_DATA;
+const COLORS = { "经纪号": "#4a7fa5", "团险号": "#5a9a8b", "算盘侠": "#c08a52" };
+const COLORS_L = { "经纪号": "#a8c4d6", "团险号": "#b2d0c9", "算盘侠": "#e0c7a8" };
+const IDS = { "经纪号": "jj", "团险号": "tx", "算盘侠": "spx" };
+const charts = [];
+
+function fmt(n) {
+  if (n === null || n === undefined) return "—";
+  if (Math.abs(n) >= 10000) return (n / 10000).toFixed(n >= 100000 ? 1 : 2) + "w";
+  return n.toLocaleString();
+}
+function fmtFull(n) { return (n === null || n === undefined) ? "—" : n.toLocaleString(); }
+function mk(id) { const c = echarts.init(document.getElementById(id)); charts.push(c); return c; }
+function delta(cur, prev, unit = "") {
+  if (prev === null || prev === undefined) return "";
+  const d = cur - prev;
+  if (d === 0) return `<span>— 持平</span>`;
+  return d > 0 ? `<span class="up">▲ ${fmt(Math.abs(d))}${unit} vs 前周</span>` : `<span class="down">▼ ${fmt(Math.abs(d))}${unit} vs 前周</span>`;
+}
+const baseAxis = (labels, rotate) => ({
+  xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11, color: "#8a8a82", rotate: rotate ? 35 : 0 }, axisLine: { lineStyle: { color: "#d8d8d0" } }, axisTick: { show: false } },
+  yAxis: { type: "value", axisLabel: { fontSize: 11, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
+  grid: { left: 60, right: 20, top: 34, bottom: rotate ? 50 : 32 },
+});
+const tooltipBox = { trigger: "axis", textStyle: { fontSize: 12 } };
+
+document.getElementById("updatedAt").textContent = `数据更新于 ${D.generatedAt} ｜ 每周一更新`;
+
+/* ================= 总览：一账号一整行 ================= */
+function renderOverview() {
+  const box = document.getElementById("page-overview");
+  box.innerHTML = "";
+  D.accounts.forEach(acc => {
+    const o = D.overview[acc];
+    const target = D.goals.fans[acc];
+    const pct = Math.min(100, o.followers / target * 100);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="ov-row">
+        <div>
+          <div class="ov-name"><span class="dot" style="background:${COLORS[acc]}"></span>${acc}</div>
+          <div class="ov-followers">${fmtFull(o.followers)}</div>
+          <div class="ov-asof">粉丝总数 · 截至 ${o.asOf}</div>
+          <div class="spark" id="spark-${IDS[acc]}"></div>
+          <div class="ov-asof">近 90 天粉丝趋势</div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="label">近 7 天净增关注</div><div class="value">${fmt(o.weekNet)}</div><div class="sub">${delta(o.weekNet, o.prevWeekNet)}</div></div>
+          <div class="kpi"><div class="label">本月净增关注</div><div class="value">${fmt(o.monthNet)}</div><div class="sub">${o.lastMonthFollowYm || ""} 完整月：${fmt(o.lastMonthFollow)}</div></div>
+          <div class="kpi"><div class="label">近 7 天日均播放</div><div class="value">${fmt(o.avgPlay7d)}</div><div class="sub">${delta(o.avgPlay7d, o.avgPlayPrev7d)}</div></div>
+          <div class="kpi"><div class="label">2026 累计播放</div><div class="value small">${fmt(o.ytdPlay)}</div><div class="sub">近 30 天日均 ${fmt(o.avgPlay30d)}</div></div>
+          <div class="kpi"><div class="label">近一年直播场次</div><div class="value small">${o.liveCountYear} 场</div><div class="sub">&nbsp;</div></div>
+          <div class="kpi"><div class="label">本周发布视频</div><div class="value small">${(D.videoDetails[acc] || []).length} 条</div><div class="sub">详见单周数据页</div></div>
+        </div>
+        <div class="goal-block">
+          <h4>年度粉丝目标 ${fmt(target)}</h4>
+          <div class="goal-num"><b>${fmt(o.followers)}</b><span>${pct.toFixed(1)}%</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${COLORS[acc]}"></div></div>
+          <div class="goal-num"><span>距目标还差 ${fmt(Math.max(0, target - o.followers))}</span></div>
+          <div class="note" id="eta-${IDS[acc]}"></div>
+        </div>
+      </div>`;
+    box.appendChild(card);
+
+    // ETA
+    const fd = D.followDaily[acc].slice(-30).filter(x => x.net !== null);
+    const rate = fd.length ? fd.reduce((s, x) => s + x.net, 0) / fd.length : 0;
+    const remain = target - o.followers;
+    let eta = "—";
+    if (remain <= 0) eta = "已达成 🎉";
+    else if (rate > 0) {
+      const dt = new Date(Date.now() + Math.ceil(remain / rate) * 86400000);
+      eta = `${dt.getFullYear()} 年 ${dt.getMonth() + 1} 月（按近 30 天日均净增 ${Math.round(rate)} 测算）`;
+    }
+    document.getElementById(`eta-${IDS[acc]}`).textContent = "预计达成：" + eta;
+
+    const c = echarts.init(document.getElementById(`spark-${IDS[acc]}`));
+    charts.push(c);
+    c.setOption({
+      grid: { left: 0, right: 0, top: 2, bottom: 2 },
+      xAxis: { type: "category", show: false, data: o.spark.map(p => p.d) },
+      yAxis: { type: "value", show: false, min: "dataMin" },
+      series: [{ type: "line", data: o.spark.map(p => p.total), smooth: true, symbol: "none",
+        lineStyle: { color: COLORS[acc], width: 1.5 }, areaStyle: { color: COLORS[acc], opacity: 0.12 } }],
+      tooltip: { trigger: "axis", formatter: p => `${p[0].name}<br>粉丝 ${fmtFull(p[0].value)}`, textStyle: { fontSize: 12 } },
+    });
+  });
+}
+
+/* ================= 单周数据 ================= */
+function renderWeekly() {
+  const w = D.weekly;
+  const dates = w.dates.map(d => d.slice(5));
+  document.getElementById("weeklyRange").textContent =
+    `最近 7 天（${w.dates[0]} ~ ${w.dates[w.dates.length - 1]}）· 每日播放 × 净增关注`;
+  document.getElementById("videoSrcTag").textContent = D.videoDetailsSrc ? `来源：${D.videoDetailsSrc}` : "";
+
+  const chartBox = document.getElementById("weeklyCharts");
+  chartBox.innerHTML = "";
+  D.accounts.forEach(acc => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc}</h3><div class="chart" id="wk-${IDS[acc]}"></div>`;
+    chartBox.appendChild(card);
+    const a = w.accounts[acc];
+    mk(`wk-${IDS[acc]}`).setOption({
+      tooltip: tooltipBox,
+      legend: { data: ["播放", "净增关注"], textStyle: { fontSize: 11, color: "#8a8a82" }, top: 0, right: 0, icon: "rect", itemWidth: 10, itemHeight: 10 },
+      ...baseAxis(dates),
+      yAxis: [
+        { type: "value", axisLabel: { fontSize: 11, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
+        { type: "value", axisLabel: { fontSize: 11, color: "#8a8a82" }, splitLine: { show: false } },
+      ],
+      series: [
+        { name: "播放", type: "bar", data: a.play, itemStyle: { color: COLORS_L[acc], borderRadius: [3, 3, 0, 0] }, barWidth: "40%",
+          label: { show: true, position: "top", fontSize: 10, color: "#8a8a82", formatter: p => fmt(p.value) } },
+        { name: "净增关注", type: "line", yAxisIndex: 1, data: a.net, itemStyle: { color: COLORS[acc] }, lineStyle: { width: 2 }, smooth: true,
+          label: { show: true, fontSize: 10, color: COLORS[acc] } },
+      ],
+    });
+  });
+
+  const vBox = document.getElementById("weeklyVideos");
+  vBox.innerHTML = "";
+  D.accounts.forEach(acc => {
+    const vids = D.videoDetails[acc] || [];
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc} · ${vids.length} 条</h3>
+      ${vids.length ? `<table class="data">
+        <tr><th>视频</th><th>发布</th><th>播放量</th><th>完播率</th><th>平均时长</th><th>喜欢</th><th>评论</th><th>分享</th><th>涨粉</th><th>类别</th></tr>
+        ${vids.map(v => `<tr>
+          <td class="title-cell" title="${v.title}">${v.title}</td>
+          <td>${v.date.slice(5)}</td>
+          <td><b>${fmtFull(v.views)}</b></td>
+          <td>${v.finishRate !== null ? v.finishRate + "%" : "—"}</td>
+          <td>${v.avgDur || "—"}</td>
+          <td>${fmtFull(v.like)}</td><td>${fmtFull(v.comment)}</td><td>${fmtFull(v.share)}</td><td>${fmtFull(v.follow)}</td>
+          <td><span class="tag">${v.cat}</span></td>
+        </tr>`).join("")}
+      </table>` : `<div class="note">本周无明细数据</div>`}`;
+    vBox.appendChild(card);
+  });
+}
+
+/* ================= 历史趋势：一账号一整行 ================= */
+function renderMonthlyFollow(acc) {
+  const rows = D.monthlyFollow[acc].slice(-12);
+  const labels = rows.map(r => r.ym);
+  const video = rows.map(r => r.video);
+  const live = rows.map(r => r.live);
+  const total = rows.map(r => r.total);
+  const lbl = { show: true, fontSize: 15, fontWeight: 700, color: "#fff", formatter: p => p.value > 0 ? fmtFull(p.value) : "" };
+  mk(`mf-${IDS[acc]}`).setOption({
+    tooltip: { ...tooltipBox, formatter: ps => {
+      const i = ps[0].dataIndex;
+      return `${labels[i]}<br>视频新增：${fmtFull(video[i])}<br>直播间新增：${fmtFull(live[i])}<br>合计：${fmtFull(total[i])}`;
+    }},
+    ...baseAxis(labels, false),
+    xAxis: { type: "category", data: labels, axisLabel: { fontSize: 14, fontWeight: 600, color: "#6a6a62" }, axisLine: { lineStyle: { color: "#d8d8d0" } }, axisTick: { show: false } },
+    yAxis: { type: "value", axisLabel: { fontSize: 13, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
+    grid: { left: 80, right: 24, top: 46, bottom: 36 },
+    series: [
+      { name: "视频新增", type: "bar", stack: "mf", data: video, itemStyle: { color: COLORS[acc] }, label: { ...lbl, position: "inside" }, barWidth: "52%" },
+      { name: "直播间新增", type: "bar", stack: "mf", data: live, itemStyle: { color: COLORS_L[acc] }, label: { ...lbl, position: "inside", color: "#4c4c45" } },
+      { name: "合计", type: "bar", stack: "mf", data: total.map(() => 0), silent: true, itemStyle: { color: "transparent" }, tooltip: { show: false },
+        label: { show: true, position: "top", fontSize: 17, fontWeight: 800, color: "#2b2b28", formatter: p => fmtFull(total[p.dataIndex]) } },
+    ],
+  });
+}
+
+function renderMonthlyPlay(acc) {
+  const rows = D.monthlyPlay[acc].slice(-12);
+  mk(`mp-${IDS[acc]}`).setOption({
+    tooltip: tooltipBox,
+    ...baseAxis(rows.map(r => r.ym), false),
+    xAxis: { type: "category", data: rows.map(r => r.ym), axisLabel: { fontSize: 14, fontWeight: 600, color: "#6a6a62" }, axisLine: { lineStyle: { color: "#d8d8d0" } }, axisTick: { show: false } },
+    yAxis: { type: "value", axisSize: 13, axisLabel: { fontSize: 13, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
+    grid: { left: 80, right: 24, top: 46, bottom: 36 },
+    series: [{ type: "line", data: rows.map(r => r.avg), smooth: true, symbol: "circle", symbolSize: 7,
+      itemStyle: { color: COLORS[acc] }, lineStyle: { width: 3, color: COLORS[acc] },
+      areaStyle: { color: COLORS[acc], opacity: 0.08 },
+      label: { show: true, fontSize: 15, fontWeight: 700, color: "#4c4c45", formatter: p => fmt(p.value) } }],
+  });
+}
+
+let followerLog = false;
+function renderFollowerHist() {
+  const series = D.accounts.map(acc => ({
+    name: acc, type: "line", showSymbol: false, smooth: true,
+    data: D.followerHist[acc].map(p => [p.d, p.total]),
+    lineStyle: { width: 2, color: COLORS[acc] }, itemStyle: { color: COLORS[acc] },
+  }));
+  mk("followerHist").setOption({
+    tooltip: { trigger: "axis", textStyle: { fontSize: 12 }, valueFormatter: v => fmtFull(v) },
+    legend: { textStyle: { fontSize: 12, color: "#8a8a82" }, top: 0 },
+    xAxis: { type: "time", axisLabel: { fontSize: 11, color: "#8a8a82" }, axisLine: { lineStyle: { color: "#d8d8d0" } } },
+    yAxis: { type: followerLog ? "log" : "value", axisLabel: { fontSize: 11, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
+    grid: { left: 70, right: 24, top: 40, bottom: 34 },
+    series,
+  });
+}
+
+function renderHistory() {
+  const mfBox = document.getElementById("mfCharts");
+  mfBox.innerHTML = "";
+  D.accounts.forEach(acc => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc}</h3><div id="mf-${IDS[acc]}" class="chart chart-tall"></div>`;
+    mfBox.appendChild(card);
+    renderMonthlyFollow(acc);
+  });
+  const mpBox = document.getElementById("mpCharts");
+  mpBox.innerHTML = "";
+  D.accounts.forEach(acc => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc}</h3><div id="mp-${IDS[acc]}" class="chart"></div>`;
+    mpBox.appendChild(card);
+    renderMonthlyPlay(acc);
+  });
+  renderFollowerHist();
+}
+
+/* ================= 爆款视频 ================= */
+const TYPE_PALETTE = ["#4a7fa5", "#c08a52", "#8a7fb8", "#5a9a8b", "#b4544a", "#7a9bb5", "#9a8a6a"];
+function renderHot() {
+  const box = document.getElementById("page-hot");
+  box.innerHTML = "";
+  const thresholds = { "经纪号": "1w+", "团险号": "5000+", "算盘侠": "5000+" };
+  D.accounts.forEach(acc => {
+    const vids = (D.hotVideos[acc] || []).filter(v => v.date);
+    if (!vids.length) return;
+    const types = [...new Set(vids.map(v => v.type))];
+    const typeColor = {};
+    types.forEach((t, i) => typeColor[t] = TYPE_PALETTE[i % TYPE_PALETTE.length]);
+    const maxV = Math.max(...vids.map(v => v.views));
+    const big50 = vids.filter(v => v.views >= 500000).length;
+    const months = new Set(vids.map(v => v.date.slice(0, 7))).size;
+
+    const sec = document.createElement("div");
+    sec.innerHTML = `<div class="section-title"><span class="dot" style="background:${COLORS[acc]};margin-right:6px"></span>${acc}爆款视频（2026 年 ${thresholds[acc]} · 共 ${vids.length} 条）</div>`;
+    const kpis = document.createElement("div");
+    kpis.className = "live-kpis";
+    kpis.innerHTML = [
+      ["爆款条数", vids.length + " 条"],
+      ["最高播放", fmt(maxV)],
+      ["50w+ 大爆款", big50 + " 条"],
+      ["月均产出", (vids.length / Math.max(1, months)).toFixed(1) + " 条/月"],
+    ].map(k => `<div class="card"><div class="kpi"><div class="label">${k[0]}</div><div class="value" style="font-size:24px">${k[1]}</div></div></div>`).join("");
+    sec.appendChild(kpis);
+
+    const uid = IDS[acc];
+    const c1 = document.createElement("div");
+    c1.className = "card";
+    c1.innerHTML = `<h3>播放量分布（颜色=视频类型，点越大播放越高；纵轴对数刻度）</h3><div id="hot-scatter-${uid}" class="chart chart-tall"></div>`;
+    sec.appendChild(c1);
+
+    // 新增：月度产出 + 类型对比
+    const c1b = document.createElement("div");
+    c1b.className = "two-col";
+    c1b.innerHTML = `
+      <div class="card"><h3>每月爆款产出（颜色=视频类型）</h3><div id="hot-month-${uid}" class="chart"></div></div>
+      <div class="card"><h3>各类型表现（条数 × 平均播放）</h3><div id="hot-type-${uid}" class="chart"></div></div>`;
+    sec.appendChild(c1b);
+
+    const top10 = vids.slice().sort((a, b) => b.views - a.views).slice(0, 10);
+    const c2 = document.createElement("div");
+    c2.className = "card";
+    c2.innerHTML = `<h3>TOP 10 榜单</h3><table class="data">
+      <tr><th>#</th><th>视频</th><th>发布</th><th>播放量</th><th>类型</th><th>主题类别</th></tr>
+      ${top10.map((v, i) => `<tr>
+        <td><b>${i + 1}</b></td>
+        <td class="title-cell" title="${v.title}">${v.title}</td>
+        <td>${v.date.slice(5)}</td>
+        <td><b>${fmt(v.views)}</b></td>
+        <td><span class="tag" style="background:${typeColor[v.type]}22;color:${typeColor[v.type]}">${v.type}</span></td>
+        <td>${v.topic || "—"}</td>
+      </tr>`).join("")}
+    </table>`;
+    sec.appendChild(c2);
+    box.appendChild(sec);
+
+    mk(`hot-scatter-${uid}`).setOption({
+      tooltip: { trigger: "item", textStyle: { fontSize: 12 }, formatter: p => {
+        const v = vids[p.value[2]];
+        return `${v.title}<br>${v.date} ｜ 播放 <b>${fmtFull(v.views)}</b><br>类型：${v.type}${v.topic ? " ｜ 主题：" + v.topic : ""}`;
+      }},
+      legend: { data: types, textStyle: { fontSize: 12, color: "#8a8a82" }, top: 0 },
+      xAxis: { type: "time", axisLabel: { fontSize: 12, color: "#8a8a82", formatter: "{M}月" }, axisLine: { lineStyle: { color: "#d8d8d0" } } },
+      yAxis: { type: "log", axisLabel: { fontSize: 12, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
+      grid: { left: 70, right: 30, top: 40, bottom: 36 },
+      series: types.map(t => ({
+        name: t, type: "scatter",
+        data: vids.map((v, i) => v.type === t ? [v.date, v.views, i] : null).filter(x => x),
+        itemStyle: { color: typeColor[t], opacity: 0.85 },
+        symbolSize: (val) => Math.max(8, Math.min(38, Math.sqrt(val[1]) / 30)),
+      })),
+    });
+
+    // 每月爆款产出（类型堆叠柱）
+    const monthList = [...new Set(vids.map(v => v.date.slice(0, 7)))].sort();
+    mk(`hot-month-${uid}`).setOption({
+      tooltip: tooltipBox,
+      legend: { data: types, textStyle: { fontSize: 11, color: "#8a8a82" }, top: 0, icon: "rect", itemWidth: 10, itemHeight: 10 },
+      xAxis: { type: "category", data: monthList, axisLabel: { fontSize: 12, color: "#8a8a82" }, axisLine: { lineStyle: { color: "#d8d8d0" } }, axisTick: { show: false } },
+      yAxis: { type: "value", minInterval: 1, axisLabel: { fontSize: 11, color: "#8a8a82" }, splitLine: { lineStyle: { color: "#efefea" } } },
+      grid: { left: 40, right: 16, top: 34, bottom: 30 },
+      series: types.map(t => ({
+        name: t, type: "bar", stack: "hot", itemStyle: { color: typeColor[t] }, barWidth: "50%",
+        data: monthList.map(m => vids.filter(v => v.type === t && v.date.startsWith(m)).length),
+        label: { show: true, fontSize: 11, color: "#fff", formatter: p => p.value > 0 ? p.value : "" },
+      })),
+    });
+
+    // 各类型表现（条数柱 + 平均播放折线）
+    const typeCnt = types.map(t => vids.filter(v => v.type === t).length);
+    const typeAvg = types.map(t => {
+      const arr = vids.filter(v => v.type === t);
+      return Math.round(arr.reduce((s, v) => s + v.views, 0) / arr.length);
+    });
+    mk(`hot-type-${uid}`).setOption({
+      tooltip: { ...tooltipBox, formatter: ps => {
+        const i = ps[0].dataIndex;
+        return `${types[i]}<br>条数：${typeCnt[i]}<br>平均播放：${fmtFull(typeAvg[i])}`;
+      }},
+      legend: { data: ["条数", "平均播放"], textStyle: { fontSize: 11, color: "#8a8a82" }, top: 0, right: 0, icon: "rect", itemWidth: 10, itemHeight: 10 },
+      xAxis: { type: "category", data: types, axisLabel: { fontSize: 12, color: "#8a8a82" }, axisLine: { lineStyle: { color: "#d8d8d0" } }, axisTick: { show: false } },
+      yAxis: [
+        { type: "value", minInterval: 1, axisLabel: { fontSize: 11, color: "#8a8a82" }, splitLine: { lineStyle: { color: "#efefea" } } },
+        { type: "value", axisLabel: { fontSize: 11, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { show: false } },
+      ],
+      grid: { left: 40, right: 56, top: 34, bottom: 30 },
+      series: [
+        { name: "条数", type: "bar", data: typeCnt, barWidth: "42%",
+          itemStyle: { color: COLORS_L[acc], borderRadius: [3, 3, 0, 0] },
+          label: { show: true, position: "top", fontSize: 12, fontWeight: 600, color: "#6a6a62" } },
+        { name: "平均播放", type: "line", yAxisIndex: 1, data: typeAvg, smooth: true, symbol: "circle", symbolSize: 7,
+          itemStyle: { color: COLORS[acc] }, lineStyle: { width: 2.5, color: COLORS[acc] } },
+      ],
+    });
+  });
+  if (!box.innerHTML) box.innerHTML = '<div class="card"><div class="note">暂无爆款数据</div></div>';
+}
+
+/* ================= 直播：按账号分区（近一年） ================= */
+function renderLive() {
+  const box = document.getElementById("page-live");
+  box.innerHTML = "";
+  const latest = D.lives[D.lives.length - 1].date;
+  const yrStart = (parseInt(latest.slice(0, 4)) - 1) + latest.slice(4);
+  const liveAccounts = ["经纪号", "团险号"];
+
+  liveAccounts.forEach(acc => {
+    const arr = D.lives.filter(l => l.account === acc && l.date >= yrStart && l.uv !== null);
+    if (!arr.length) return;
+    const avg = k => arr.reduce((s, x) => s + (x[k] || 0), 0) / arr.length;
+    const sec = document.createElement("div");
+    sec.innerHTML = `<div class="section-title"><span class="dot" style="background:${COLORS[acc]};margin-right:6px"></span>${acc}直播（近一年 · ${arr.length} 场）</div>`;
+    const kpis = document.createElement("div");
+    kpis.className = "live-kpis";
+    kpis.innerHTML = [
+      ["场次", arr.length + " 场"],
+      ["平均 UV", fmt(Math.round(avg("uv")))],
+      ["平均观看时长", avg("avgMin").toFixed(1) + " 分钟"],
+      ["平均新增关注", fmt(Math.round(avg("newFollow")))],
+    ].map(k => `<div class="card"><div class="kpi"><div class="label">${k[0]}</div><div class="value" style="font-size:24px">${k[1]}</div></div></div>`).join("");
+    sec.appendChild(kpis);
+
+    const uid = IDS[acc];
+    const c1 = document.createElement("div");
+    c1.className = "card";
+    c1.innerHTML = `<h3>每场 UV × 新增关注</h3><div id="live-uv-${uid}" class="chart"></div>`;
+    sec.appendChild(c1);
+    const c2 = document.createElement("div");
+    c2.className = "card";
+    c2.innerHTML = `<h3>平均观看时长趋势（分钟）</h3><div id="live-dur-${uid}" class="chart"></div>`;
+    sec.appendChild(c2);
+    const c3 = document.createElement("div");
+    c3.className = "card";
+    const last10 = arr.slice(-10).reverse();
+    c3.innerHTML = `<h3>最近 10 场明细</h3><table class="data">
+      <tr><th>日期</th><th>主题</th><th>UV</th><th>平均观看时长</th><th>新增关注</th></tr>
+      ${last10.map(l => `<tr><td>${l.date}</td><td class="title-cell" title="${l.title}">${l.title}</td><td>${fmtFull(l.uv)}</td><td>${l.avgMin !== null ? l.avgMin + " 分钟" : "—"}</td><td>${fmtFull(l.newFollow)}</td></tr>`).join("")}
+    </table>`;
+    sec.appendChild(c3);
+    box.appendChild(sec);
+
+    const labels = arr.map(l => l.date.slice(5));
+    mk(`live-uv-${uid}`).setOption({
+      tooltip: { ...tooltipBox, formatter: ps => {
+        const l = arr[ps[0].dataIndex];
+        return `${l.date} ${l.title}<br>UV：${fmtFull(l.uv)}<br>新增关注：${fmtFull(l.newFollow)}`;
+      }},
+      legend: { data: ["UV", "新增关注"], textStyle: { fontSize: 11, color: "#8a8a82" }, top: 0, right: 0, icon: "rect", itemWidth: 10, itemHeight: 10 },
+      ...baseAxis(labels, arr.length > 12),
+      yAxis: [
+        { type: "value", axisLabel: { fontSize: 11, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
+        { type: "value", axisLabel: { fontSize: 11, color: "#8a8a82" }, splitLine: { show: false } },
+      ],
+      series: [
+        { name: "UV", type: "bar", data: arr.map(l => l.uv), itemStyle: { color: COLORS_L[acc], borderRadius: [3, 3, 0, 0] } },
+        { name: "新增关注", type: "line", yAxisIndex: 1, data: arr.map(l => l.newFollow), itemStyle: { color: COLORS[acc] }, lineStyle: { width: 2 }, smooth: true },
+      ],
+    });
+    mk(`live-dur-${uid}`).setOption({
+      tooltip: { ...tooltipBox, formatter: ps => {
+        const l = arr[ps[0].dataIndex];
+        return `${l.date} ${l.title}<br>平均观看时长：${l.avgMin} 分钟`;
+      }},
+      ...baseAxis(labels, arr.length > 12),
+      series: [{ type: "line", data: arr.map(l => l.avgMin), smooth: true, symbol: "circle", symbolSize: 5,
+        itemStyle: { color: COLORS[acc] }, lineStyle: { width: 2, color: COLORS[acc] }, areaStyle: { color: COLORS[acc], opacity: 0.08 } }],
+    });
+  });
+  const note = document.createElement("div");
+  note.className = "note";
+  note.textContent = "账号归属口径：业务线为「团险」归入团险号，其余（短险/长险/综合等）归入经纪号。";
+  box.appendChild(note);
+}
+
+/* ================= 目标与待办 ================= */
+function etaFans(acc) {
+  const o = D.overview[acc];
+  const target = D.goals.fans[acc];
+  const remain = target - o.followers;
+  const fd = D.followDaily[acc].slice(-30).filter(x => x.net !== null);
+  const rate = fd.length ? fd.reduce((s, x) => s + x.net, 0) / fd.length : 0;
+  if (remain <= 0) return "已达成 🎉";
+  if (rate <= 0) return "—";
+  const dt = new Date(Date.now() + Math.ceil(remain / rate) * 86400000);
+  return `${dt.getFullYear()} 年 ${dt.getMonth() + 1} 月（按近 30 天日均净增 ${Math.round(rate)} 测算）`;
+}
+
+function renderGoals() {
+  const box = document.getElementById("goalCards");
+  box.innerHTML = "";
+  D.accounts.forEach(acc => {
+    const o = D.overview[acc];
+    const target = D.goals.fans[acc];
+    const pct = Math.min(100, o.followers / target * 100);
+    box.innerHTML += `
+      <div class="card">
+        <h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc} · 目标 ${fmt(target)}</h3>
+        <div class="goal-num"><b>${fmt(o.followers)}</b><span>${pct.toFixed(1)}%</span></div>
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${COLORS[acc]}"></div></div>
+        <div class="goal-num"><span>距目标还差 ${fmt(Math.max(0, target - o.followers))}</span></div>
+        <div class="note">预计达成：${etaFans(acc)}</div>
+      </div>`;
+  });
+
+  const pBox = document.getElementById("playGoalCards");
+  pBox.innerHTML = "";
+  const yearEnd = new Date(new Date().getFullYear(), 11, 31);
+  const daysLeft = Math.max(0, Math.ceil((yearEnd - Date.now()) / 86400000));
+  D.accounts.forEach(acc => {
+    const o = D.overview[acc];
+    const target = D.goals.playTotal ? D.goals.playTotal[acc] : null;
+    if (!target) {
+      pBox.innerHTML += `
+        <div class="card placeholder-card">
+          <h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc} · 总播放目标</h3>
+          <div class="kpi"><div class="value">待定</div><div class="sub">2026 累计播放 ${fmt(o.ytdPlay)}</div></div>
+        </div>`;
+      return;
+    }
+    const pct = Math.min(100, o.ytdPlay / target * 100);
+    const projected = o.ytdPlay + (o.avgPlay30d || 0) * daysLeft;
+    const projPct = (projected / target * 100).toFixed(0);
+    pBox.innerHTML += `
+      <div class="card">
+        <h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc} · 目标 ${fmt(target)}</h3>
+        <div class="goal-num"><b>${fmt(o.ytdPlay)}</b><span>${pct.toFixed(1)}%</span></div>
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${COLORS[acc]}"></div></div>
+        <div class="goal-num"><span>距目标还差 ${fmt(Math.max(0, target - o.ytdPlay))}</span></div>
+        <div class="note">按近 30 天日均播放 ${fmt(o.avgPlay30d)} 测算，年底预计达 ${fmt(Math.round(projected))}（目标的 ${projPct}%）</div>
+      </div>`;
+  });
+
+  document.getElementById("todoList").innerHTML =
+    D.todos.map(t => `<li><span class="todo-box"></span><span>${t.text}</span></li>`).join("");
+}
+
+/* ================= 页签切换 ================= */
+const rendered = { overview: false, weekly: false, history: false, hot: false, live: false, goals: false };
+const renders = { overview: renderOverview, weekly: renderWeekly, history: renderHistory, hot: renderHot, live: renderLive, goals: renderGoals };
+
+function show(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById(`page-${page}`).classList.add("active");
+  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  if (!rendered[page]) { renders[page](); rendered[page] = true; }
+  charts.forEach(c => c.resize());
+}
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => show(b.dataset.page)));
+document.getElementById("logToggle").addEventListener("click", () => {
+  followerLog = !followerLog;
+  const c = charts.find(x => x.getDom().id === "followerHist");
+  if (c) c.setOption({ yAxis: { type: followerLog ? "log" : "value" } });
+});
+window.addEventListener("resize", () => charts.forEach(c => c.resize()));
+
+renderOverview();
+rendered.overview = true;
+</script>
+</body>
+</html>
