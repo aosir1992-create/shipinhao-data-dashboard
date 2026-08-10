@@ -94,6 +94,8 @@
     background: var(--bg); color: var(--muted); cursor: pointer; outline: none; transition: all .15s; }
   .filter-bar .tag-btn:hover { border-color: var(--accent); color: var(--accent); }
   .filter-bar .tag-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .filter-bar label.tag-btn { cursor: pointer; user-select: none; }
+  .filter-bar label.tag-btn input { position: absolute; opacity: 0; pointer-events: none; }
   .vd-cnt { color: var(--accent); }
   .live-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
   @media (max-width: 900px) { .live-kpis { grid-template-columns: repeat(2, 1fr); } }
@@ -176,6 +178,19 @@ const D = window.DASHBOARD_DATA;
 const COLORS = { "经纪号": "#4a7fa5", "团险号": "#5a9a8b", "算盘侠": "#c08a52" };
 const COLORS_L = { "经纪号": "#a8c4d6", "团险号": "#b2d0c9", "算盘侠": "#e0c7a8" };
 const IDS = { "经纪号": "jj", "团险号": "tx", "算盘侠": "spx" };
+const VIDEO_COLUMNS = [
+  { key: "title", label: "视频" },
+  { key: "date", label: "发布" },
+  { key: "views", label: "播放量" },
+  { key: "finishRate", label: "完播率" },
+  { key: "avgDur", label: "平均时长" },
+  { key: "like", label: "喜欢" },
+  { key: "comment", label: "评论" },
+  { key: "share", label: "分享" },
+  { key: "follow", label: "涨粉" },
+  { key: "cat", label: "类别" },
+];
+if (!window._weeklyVisibleCols) window._weeklyVisibleCols = new Set(VIDEO_COLUMNS.map(c => c.key));
 const charts = [];
 
 function fmt(n) {
@@ -298,6 +313,43 @@ function renderWeekly() {
 
   const vBox = document.getElementById("weeklyVideos");
   vBox.innerHTML = "";
+
+  // 页面级列显示控制
+  const visibleCols = window._weeklyVisibleCols;
+  const colToggle = document.createElement("div");
+  colToggle.className = "card";
+  colToggle.style.marginBottom = "18px";
+  colToggle.innerHTML = `<h3>显示列</h3>`;
+  const colBar = document.createElement("div");
+  colBar.className = "filter-bar";
+  const colWrap = document.createElement("div");
+  colWrap.className = "tags";
+  function redrawAll() {
+    D.accounts.forEach((acc, idx) => {
+      const card = vBox.children[idx];
+      if (card && card._draw) card._draw(card._activeCat);
+    });
+  }
+  VIDEO_COLUMNS.forEach(col => {
+    const label = document.createElement("label");
+    label.className = "tag-btn" + (visibleCols.has(col.key) ? " active" : "");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.style.display = "none";
+    cb.checked = visibleCols.has(col.key);
+    cb.addEventListener("change", () => {
+      if (cb.checked) visibleCols.add(col.key); else visibleCols.delete(col.key);
+      label.classList.toggle("active", cb.checked);
+      redrawAll();
+    });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(col.label));
+    colWrap.appendChild(label);
+  });
+  colBar.appendChild(colWrap);
+  colToggle.appendChild(colBar);
+  vBox.appendChild(colToggle);
+
   D.accounts.forEach(acc => {
     const all = (D.videoDetails[acc] || []).slice().sort((a, b) => (b.views || 0) - (a.views || 0));
     const cats = Array.from(new Set(all.map(v => v.cat).filter(Boolean)));
@@ -313,23 +365,34 @@ function renderWeekly() {
     const allLabel = "全部";
     const labels = [allLabel, ...cats];
     const tableWrap = document.createElement("div");
+    function cell(v, key) {
+      if (!visibleCols.has(key)) return "";
+      switch (key) {
+        case "title": return `<td class="title-cell" title="${esc(v.title)}">${esc(v.title)}</td>`;
+        case "date": return `<td>${v.date.slice(5)}</td>`;
+        case "views": return `<td><b>${fmtFull(v.views)}</b></td>`;
+        case "finishRate": return `<td>${v.finishRate !== null ? v.finishRate + "%" : "—"}</td>`;
+        case "avgDur": return `<td>${v.avgDur || "—"}</td>`;
+        case "like": return `<td>${fmtFull(v.like)}</td>`;
+        case "comment": return `<td>${fmtFull(v.comment)}</td>`;
+        case "share": return `<td>${fmtFull(v.share)}</td>`;
+        case "follow": return `<td>${fmtFull(v.follow)}</td>`;
+        case "cat": return `<td><span class="tag">${esc(v.cat)}</span></td>`;
+      }
+      return "";
+    }
     function draw(active) {
+      card._activeCat = active;
       const list = active === allLabel ? all : all.filter(v => v.cat === active);
       card.querySelector(".vd-cnt").textContent = list.length;
+      const ths = VIDEO_COLUMNS.map(c => visibleCols.has(c.key) ? `<th>${c.label}</th>` : "").join("");
       tableWrap.innerHTML = list.length ? `<table class="data">
-        <tr><th>视频</th><th>发布</th><th>播放量</th><th>完播率</th><th>平均时长</th><th>喜欢</th><th>评论</th><th>分享</th><th>涨粉</th><th>类别</th></tr>
-        ${list.map(v => `<tr>
-          <td class="title-cell" title="${esc(v.title)}">${esc(v.title)}</td>
-          <td>${v.date.slice(5)}</td>
-          <td><b>${fmtFull(v.views)}</b></td>
-          <td>${v.finishRate !== null ? v.finishRate + "%" : "—"}</td>
-          <td>${v.avgDur || "—"}</td>
-          <td>${fmtFull(v.like)}</td><td>${fmtFull(v.comment)}</td><td>${fmtFull(v.share)}</td><td>${fmtFull(v.follow)}</td>
-          <td><span class="tag">${esc(v.cat)}</span></td>
-        </tr>`).join("")}
+        <tr>${ths}</tr>
+        ${list.map(v => `<tr>${VIDEO_COLUMNS.map(c => cell(v, c.key)).join("")}</tr>`).join("")}
       </table>` : `<div class="note">该类别本周无明细数据</div>`;
       buttons.forEach(b => b.classList.toggle("active", b.dataset.cat === active));
     }
+    card._draw = draw;
     labels.forEach(lbl => {
       const b = document.createElement("button");
       b.className = "tag-btn";
