@@ -18,9 +18,10 @@
     --c-tx-l: #b2d0c9;
     --c-spx: #c08a52;
     --c-spx-l: #e0c7a8;
-    --up: #b4544a;
-    --down: #5a8a6a;
-  }
+  --up: #b4544a;
+  --down: #5a8a6a;
+  --accent: #5b7c99;
+}
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -97,6 +98,33 @@
   .filter-bar label.tag-btn { cursor: pointer; user-select: none; }
   .filter-bar label.tag-btn input { position: absolute; opacity: 0; pointer-events: none; }
   .vd-cnt { color: var(--accent); }
+  .tiny-btn { font-size: 12px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--muted); cursor: pointer; }
+  .tiny-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .vd-status { font-size: 12px; color: var(--muted); margin: 0 0 12px 2px; }
+  .vd-status b { color: var(--accent); }
+
+  /* 列头下拉筛选（Excel 自动筛选风格） */
+  table.data th { position: relative; cursor: default; }
+  table.data th .th-inner { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+  table.data th .th-inner:hover { color: var(--accent); }
+  .filter-ico { font-size: 10px; color: #c2c2ba; line-height: 1; transition: color .15s; }
+  .filter-ico.on { color: var(--accent); font-weight: 700; }
+  .filter-pop { position: fixed; z-index: 999; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.16); padding: 12px; width: 232px; font-size: 13px; }
+  .filter-pop .fp-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+  .filter-pop .fp-op { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; margin-bottom: 8px; background: var(--bg); color: var(--ink); }
+  .filter-pop .fp-num { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .filter-pop .fp-num input { flex: 1; min-width: 0; width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+  .filter-pop .fp-and { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+  .filter-pop .fp-tools { display: flex; gap: 8px; margin-bottom: 8px; }
+  .filter-pop .fp-tools button, .filter-pop .fp-actions button { font-size: 12px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--muted); cursor: pointer; }
+  .filter-pop .fp-tools button:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-pop .fp-list { max-height: 220px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 6px; }
+  .filter-pop .fp-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; cursor: pointer; }
+  .filter-pop .fp-item:hover { background: var(--bg); }
+  .filter-pop .fp-item input { accent-color: var(--accent); }
+  .filter-pop .fp-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .filter-pop .fp-apply { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
+
   .live-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
   @media (max-width: 900px) { .live-kpis { grid-template-columns: repeat(2, 1fr); } }
   .live-kpis .card { margin-bottom: 0; }
@@ -179,18 +207,21 @@ const COLORS = { "经纪号": "#4a7fa5", "团险号": "#5a9a8b", "算盘侠": "#
 const COLORS_L = { "经纪号": "#a8c4d6", "团险号": "#b2d0c9", "算盘侠": "#e0c7a8" };
 const IDS = { "经纪号": "jj", "团险号": "tx", "算盘侠": "spx" };
 const VIDEO_COLUMNS = [
-  { key: "title", label: "视频" },
-  { key: "date", label: "发布" },
-  { key: "views", label: "播放量" },
-  { key: "finishRate", label: "完播率" },
-  { key: "avgDur", label: "平均时长" },
-  { key: "like", label: "喜欢" },
-  { key: "comment", label: "评论" },
-  { key: "share", label: "分享" },
-  { key: "follow", label: "涨粉" },
-  { key: "cat", label: "类别" },
+  { key: "title", label: "视频", type: "text" },
+  { key: "date", label: "发布", type: "text" },
+  { key: "views", label: "播放量", type: "num" },
+  { key: "finishRate", label: "完播率", type: "num" },
+  { key: "avgDur", label: "平均时长", type: "text" },
+  { key: "like", label: "喜欢", type: "num" },
+  { key: "comment", label: "评论", type: "num" },
+  { key: "share", label: "分享", type: "num" },
+  { key: "follow", label: "涨粉", type: "num" },
+  { key: "cat", label: "类别", type: "cat" },
 ];
-if (!window._weeklyVisibleCols) window._weeklyVisibleCols = new Set(VIDEO_COLUMNS.map(c => c.key));
+// 每账号一列头下拉筛选状态：filters[acc][colKey] = {op,v1,v2}（数值）或 {values:[...]}（文本/类别）
+const filters = {};
+const accCards = {};
+let _filterPop = null;
 const charts = [];
 
 function fmt(n) {
@@ -313,65 +344,38 @@ function renderWeekly() {
 
   const vBox = document.getElementById("weeklyVideos");
   vBox.innerHTML = "";
-
-  // 页面级列显示控制
-  const visibleCols = window._weeklyVisibleCols;
-  const colToggle = document.createElement("div");
-  colToggle.className = "card";
-  colToggle.style.marginBottom = "18px";
-  colToggle.innerHTML = `<h3>显示列</h3>`;
-  const colBar = document.createElement("div");
-  colBar.className = "filter-bar";
-  const colWrap = document.createElement("div");
-  colWrap.className = "tags";
-  function redrawAll() {
-    D.accounts.forEach((acc, idx) => {
-      const card = vBox.children[idx];
-      if (card && card._draw) card._draw(card._activeCat);
-    });
-  }
-  VIDEO_COLUMNS.forEach(col => {
-    const label = document.createElement("label");
-    label.className = "tag-btn" + (visibleCols.has(col.key) ? " active" : "");
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.style.display = "none";
-    cb.checked = visibleCols.has(col.key);
-    cb.addEventListener("change", () => {
-      if (cb.checked) visibleCols.add(col.key); else visibleCols.delete(col.key);
-      label.classList.toggle("active", cb.checked);
-      redrawAll();
-    });
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(col.label));
-    colWrap.appendChild(label);
-  });
-  colBar.appendChild(colWrap);
-  colToggle.appendChild(colBar);
-  vBox.appendChild(colToggle);
+  ensureFilterPop();
 
   D.accounts.forEach(acc => {
     const all = (D.videoDetails[acc] || []).slice().sort((a, b) => (b.views || 0) - (a.views || 0));
-    const cats = Array.from(new Set(all.map(v => v.cat).filter(Boolean)));
+    const uniq = {};
+    VIDEO_COLUMNS.forEach(c => {
+      uniq[c.key] = Array.from(new Set(all.map(v => String(v[c.key] == null ? "" : v[c.key]))));
+    });
+    filters[acc] = { _uniq: uniq };
+
     const card = document.createElement("div");
     card.className = "card";
     const head = document.createElement("div");
-    head.innerHTML = `<h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc} · <span class="vd-cnt">${all.length}</span> 条</h3>`;
-    const filterBar = document.createElement("div");
-    filterBar.className = "filter-bar";
-    const btnWrap = document.createElement("div");
-    btnWrap.className = "tags";
-    const buttons = [];
-    const allLabel = "全部";
-    const labels = [allLabel, ...cats];
+    head.style.display = "flex";
+    head.style.alignItems = "center";
+    head.innerHTML = `<h3 style="margin-bottom:0"><span class="dot" style="background:${COLORS[acc]}"></span>${acc} · <span class="vd-cnt">${all.length}</span> 条</h3>`;
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "tiny-btn";
+    clearBtn.textContent = "清除本账号筛选";
+    clearBtn.style.marginLeft = "auto";
+    clearBtn.addEventListener("click", () => { filters[acc] = { _uniq: uniq }; card._draw(); });
+    head.appendChild(clearBtn);
+    const status = document.createElement("div");
+    status.className = "vd-status";
     const tableWrap = document.createElement("div");
+
     function cell(v, key) {
-      if (!visibleCols.has(key)) return "";
       switch (key) {
         case "title": return `<td class="title-cell" title="${esc(v.title)}">${esc(v.title)}</td>`;
         case "date": return `<td>${v.date.slice(5)}</td>`;
         case "views": return `<td><b>${fmtFull(v.views)}</b></td>`;
-        case "finishRate": return `<td>${v.finishRate !== null ? v.finishRate + "%" : "—"}</td>`;
+        case "finishRate": return `<td>${v.finishRate !== null && v.finishRate !== undefined ? v.finishRate + "%" : "—"}</td>`;
         case "avgDur": return `<td>${v.avgDur || "—"}</td>`;
         case "like": return `<td>${fmtFull(v.like)}</td>`;
         case "comment": return `<td>${fmtFull(v.comment)}</td>`;
@@ -381,35 +385,131 @@ function renderWeekly() {
       }
       return "";
     }
-    function draw(active) {
-      card._activeCat = active;
-      const list = active === allLabel ? all : all.filter(v => v.cat === active);
+    function pass(v) {
+      const f = filters[acc];
+      for (const c of VIDEO_COLUMNS) {
+        const spec = f[c.key];
+        if (!spec) continue;
+        if (c.type === "num") {
+          const val = Number(v[c.key]);
+          if (isNaN(val)) return false;
+          const v1 = Number(spec.v1), v2 = Number(spec.v2);
+          if (spec.op === "gt" && !(val > v1)) return false;
+          else if (spec.op === "gte" && !(val >= v1)) return false;
+          else if (spec.op === "lt" && !(val < v1)) return false;
+          else if (spec.op === "lte" && !(val <= v1)) return false;
+          else if (spec.op === "eq" && !(val === v1)) return false;
+          else if (spec.op === "between" && !(val >= v1 && val <= v2)) return false;
+        } else {
+          const vals = spec.values || [];
+          const allUniq = f._uniq[c.key];
+          const rv = String(v[c.key] == null ? "" : v[c.key]);
+          if (vals.length && vals.length < allUniq.length && !vals.includes(rv)) return false;
+        }
+      }
+      return true;
+    }
+    function draw() {
+      const list = all.filter(pass);
       card.querySelector(".vd-cnt").textContent = list.length;
-      const ths = VIDEO_COLUMNS.map(c => visibleCols.has(c.key) ? `<th>${c.label}</th>` : "").join("");
-      tableWrap.innerHTML = list.length ? `<table class="data">
-        <tr>${ths}</tr>
-        ${list.map(v => `<tr>${VIDEO_COLUMNS.map(c => cell(v, c.key)).join("")}</tr>`).join("")}
-      </table>` : `<div class="note">该类别本周无明细数据</div>`;
-      buttons.forEach(b => b.classList.toggle("active", b.dataset.cat === active));
+      const activeCount = VIDEO_COLUMNS.filter(c => filters[acc][c.key]).length;
+      status.innerHTML = activeCount
+        ? `已筛选：显示 <b>${list.length}</b> / ${all.length} 条 · 共 ${activeCount} 项筛选条件`
+        : `共 ${all.length} 条（按播放量降序）· 点击列表头 ▾ 可下拉筛选`;
+      const ths = VIDEO_COLUMNS.map(c => {
+        const on = !!filters[acc][c.key];
+        return `<th><span class="th-inner" data-col="${c.key}">${c.label}<span class="filter-ico ${on ? "on" : ""}">${on ? "▾" : "⇲"}</span></span></th>`;
+      }).join("");
+      tableWrap.innerHTML = list.length
+        ? `<table class="data"><tr>${ths}</tr>${list.map(v => `<tr>${VIDEO_COLUMNS.map(c => cell(v, c.key)).join("")}</tr>`).join("")}</table>`
+        : `<div class="note">无符合筛选条件的数据</div>`;
+      tableWrap.querySelectorAll(".th-inner").forEach(el => {
+        el.addEventListener("click", e => { e.stopPropagation(); openFilterPop(acc, el.dataset.col, el); });
+      });
     }
     card._draw = draw;
-    labels.forEach(lbl => {
-      const b = document.createElement("button");
-      b.className = "tag-btn";
-      b.textContent = lbl;
-      b.dataset.cat = lbl;
-      b.addEventListener("click", () => draw(lbl));
-      btnWrap.appendChild(b);
-      buttons.push(b);
-    });
-    filterBar.appendChild(document.createTextNode("类别："));
-    filterBar.appendChild(btnWrap);
+    accCards[acc] = card;
     card.appendChild(head);
-    card.appendChild(filterBar);
+    card.appendChild(status);
     card.appendChild(tableWrap);
     vBox.appendChild(card);
-    draw(allLabel);
+    draw();
   });
+}
+
+/* 列头下拉筛选弹窗（Excel 自动筛选风格） */
+function ensureFilterPop() {
+  if (_filterPop) return;
+  _filterPop = document.createElement("div");
+  _filterPop.className = "filter-pop";
+  _filterPop.style.display = "none";
+  document.body.appendChild(_filterPop);
+  document.addEventListener("mousedown", e => {
+    if (_filterPop.style.display !== "none" && !_filterPop.contains(e.target)) _filterPop.style.display = "none";
+  });
+}
+function redrawAcc(acc) { const c = accCards[acc]; if (c && c._draw) c._draw(); }
+function openFilterPop(acc, colKey, anchorEl) {
+  ensureFilterPop();
+  const col = VIDEO_COLUMNS.find(c => c.key === colKey);
+  const uniq = filters[acc]._uniq[colKey];
+  const cur = filters[acc][colKey];
+  let html = "";
+  if (col.type === "num") {
+    const ops = [["gt", "大于"], ["gte", "≥"], ["lt", "小于"], ["lte", "≤"], ["eq", "等于"], ["between", "介于"]];
+    const sel = cur ? cur.op : "gt";
+    html += `<div class="fp-title">${col.label} · 数值筛选</div>`;
+    html += `<select class="fp-op">${ops.map(o => `<option value="${o[0]}" ${o[0] === sel ? "selected" : ""}>${o[1]}</option>`).join("")}</select>`;
+    html += `<div class="fp-num"><input class="fp-v1" type="number" placeholder="数值" value="${cur ? cur.v1 : ""}">`;
+    html += `<span class="fp-and">至</span><input class="fp-v2" type="number" placeholder="数值" value="${cur ? cur.v2 : ""}"></div>`;
+    html += `<div class="fp-actions"><button class="fp-apply">应用</button><button class="fp-clear">清除</button></div>`;
+  } else {
+    const selected = cur ? cur.values : uniq;
+    html += `<div class="fp-title">${col.label} · 按值筛选</div>`;
+    html += `<div class="fp-tools"><button class="fp-all">全选</button><button class="fp-none">清空</button></div>`;
+    html += `<div class="fp-list">${uniq.map(u => `<label class="fp-item"><input type="checkbox" ${selected.includes(u) ? "checked" : ""} value="${esc(u)}"><span>${esc(u) || "(空)"}</span></label>`).join("")}</div>`;
+    html += `<div class="fp-actions"><button class="fp-apply">应用</button><button class="fp-clear">清除</button></div>`;
+  }
+  _filterPop.innerHTML = html;
+  const r = anchorEl.getBoundingClientRect();
+  _filterPop.style.display = "block";
+  const pw = _filterPop.offsetWidth, ph = _filterPop.offsetHeight;
+  let left = r.left, top = r.bottom + 4;
+  if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+  if (top + ph > window.innerHeight - 8) top = r.top - ph - 4;
+  _filterPop.style.left = Math.max(8, left) + "px";
+  _filterPop.style.top = Math.max(8, top) + "px";
+
+  if (col.type === "num") {
+    const opSel = _filterPop.querySelector(".fp-op");
+    const v1 = _filterPop.querySelector(".fp-v1");
+    const v2 = _filterPop.querySelector(".fp-v2");
+    const syncV2 = () => { v2.style.display = opSel.value === "between" ? "" : "none"; };
+    opSel.addEventListener("change", syncV2); syncV2();
+    _filterPop.querySelector(".fp-apply").addEventListener("mousedown", e => {
+      e.stopPropagation();
+      const op = opSel.value;
+      if (v1.value === "" || (op === "between" && (v2.value === ""))) { delete filters[acc][colKey]; }
+      else filters[acc][colKey] = { op, v1: v1.value, v2: op === "between" ? v2.value : "" };
+      _filterPop.style.display = "none"; redrawAcc(acc);
+    });
+    _filterPop.querySelector(".fp-clear").addEventListener("mousedown", e => {
+      e.stopPropagation(); delete filters[acc][colKey]; _filterPop.style.display = "none"; redrawAcc(acc);
+    });
+  } else {
+    _filterPop.querySelector(".fp-all").addEventListener("mousedown", e => { e.stopPropagation(); _filterPop.querySelectorAll(".fp-item input").forEach(c => c.checked = true); });
+    _filterPop.querySelector(".fp-none").addEventListener("mousedown", e => { e.stopPropagation(); _filterPop.querySelectorAll(".fp-item input").forEach(c => c.checked = false); });
+    _filterPop.querySelector(".fp-apply").addEventListener("mousedown", e => {
+      e.stopPropagation();
+      const vals = Array.from(_filterPop.querySelectorAll(".fp-item input:checked")).map(c => c.value);
+      if (vals.length >= uniq.length) delete filters[acc][colKey];
+      else filters[acc][colKey] = { values: vals };
+      _filterPop.style.display = "none"; redrawAcc(acc);
+    });
+    _filterPop.querySelector(".fp-clear").addEventListener("mousedown", e => {
+      e.stopPropagation(); delete filters[acc][colKey]; _filterPop.style.display = "none"; redrawAcc(acc);
+    });
+  }
 }
 
 /* ================= 历史趋势：一账号一整行 ================= */
