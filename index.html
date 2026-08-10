@@ -87,6 +87,12 @@
   .todo-list li:last-child { border-bottom: none; }
   .todo-box { width: 16px; height: 16px; border: 1.5px solid #c5c5bc; border-radius: 4px; flex-shrink: 0; }
   .note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .filter-bar .fb-label { font-size: 12px; color: var(--muted); }
+  .filter-bar select { font-size: 12px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--fg); cursor: pointer; outline: none; }
+  .filter-bar select:hover { border-color: var(--accent); }
+  .vd-cnt { color: var(--accent); }
   .live-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
   @media (max-width: 900px) { .live-kpis { grid-template-columns: repeat(2, 1fr); } }
   .live-kpis .card { margin-bottom: 0; }
@@ -176,6 +182,7 @@ function fmt(n) {
   return n.toLocaleString();
 }
 function fmtFull(n) { return (n === null || n === undefined) ? "—" : n.toLocaleString(); }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function mk(id) { const c = echarts.init(document.getElementById(id)); charts.push(c); return c; }
 function delta(cur, prev, unit = "") {
   if (prev === null || prev === undefined) return "";
@@ -290,24 +297,42 @@ function renderWeekly() {
   const vBox = document.getElementById("weeklyVideos");
   vBox.innerHTML = "";
   D.accounts.forEach(acc => {
-    const vids = (D.videoDetails[acc] || []).slice().sort((a, b) => (b.views || 0) - (a.views || 0));
+    const all = (D.videoDetails[acc] || []).slice().sort((a, b) => (b.views || 0) - (a.views || 0));
+    const cats = Array.from(new Set(all.map(v => v.cat).filter(Boolean)));
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `
-      <h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc} · ${vids.length} 条</h3>
-      ${vids.length ? `<table class="data">
+    const head = document.createElement("div");
+    head.innerHTML = `<h3><span class="dot" style="background:${COLORS[acc]}"></span>${acc} · <span class="vd-cnt">${all.length}</span> 条</h3>`;
+    const filterBar = document.createElement("div");
+    filterBar.className = "filter-bar";
+    filterBar.innerHTML = `<span class="fb-label">类别</span>`;
+    const sel = document.createElement("select");
+    sel.innerHTML = `<option value="__all__">全部</option>` +
+      cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+    filterBar.appendChild(sel);
+    const tableWrap = document.createElement("div");
+    function draw(filter) {
+      const list = filter === "__all__" ? all : all.filter(v => v.cat === filter);
+      card.querySelector(".vd-cnt").textContent = list.length;
+      tableWrap.innerHTML = list.length ? `<table class="data">
         <tr><th>视频</th><th>发布</th><th>播放量</th><th>完播率</th><th>平均时长</th><th>喜欢</th><th>评论</th><th>分享</th><th>涨粉</th><th>类别</th></tr>
-        ${vids.map(v => `<tr>
-          <td class="title-cell" title="${v.title}">${v.title}</td>
+        ${list.map(v => `<tr>
+          <td class="title-cell" title="${esc(v.title)}">${esc(v.title)}</td>
           <td>${v.date.slice(5)}</td>
           <td><b>${fmtFull(v.views)}</b></td>
           <td>${v.finishRate !== null ? v.finishRate + "%" : "—"}</td>
           <td>${v.avgDur || "—"}</td>
           <td>${fmtFull(v.like)}</td><td>${fmtFull(v.comment)}</td><td>${fmtFull(v.share)}</td><td>${fmtFull(v.follow)}</td>
-          <td><span class="tag">${v.cat}</span></td>
+          <td><span class="tag">${esc(v.cat)}</span></td>
         </tr>`).join("")}
-      </table>` : `<div class="note">本周无明细数据</div>`}`;
+      </table>` : `<div class="note">该类别本周无明细数据</div>`;
+    }
+    sel.addEventListener("change", () => draw(sel.value));
+    card.appendChild(head);
+    card.appendChild(filterBar);
+    card.appendChild(tableWrap);
     vBox.appendChild(card);
+    draw("__all__");
   });
 }
 
