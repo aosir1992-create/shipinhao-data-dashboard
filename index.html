@@ -290,7 +290,7 @@ function renderWeekly() {
   const vBox = document.getElementById("weeklyVideos");
   vBox.innerHTML = "";
   D.accounts.forEach(acc => {
-    const vids = D.videoDetails[acc] || [];
+    const vids = (D.videoDetails[acc] || []).slice().sort((a, b) => (b.views || 0) - (a.views || 0));
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
