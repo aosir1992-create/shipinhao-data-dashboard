@@ -200,7 +200,7 @@
   </section>
 </div>
 
-<script src="data.js?v=20260901a"></script>
+<script src="data.js?v=20260901b"></script>
 <script>
 const D = window.DASHBOARD_DATA;
 const COLORS = { "经纪号": "#4a7fa5", "团险号": "#5a9a8b", "算盘侠": "#c08a52" };
@@ -230,6 +230,13 @@ function fmt(n) {
   return n.toLocaleString();
 }
 function fmtFull(n) { return (n === null || n === undefined) ? "—" : n.toLocaleString(); }
+function fmtDur(min) {
+  if (min === null || min === undefined || isNaN(min)) return "—";
+  let m = Math.floor(min);
+  let s = Math.round((min - m) * 60);
+  if (s === 60) { m += 1; s = 0; }
+  return s === 0 ? `${m}分` : `${m}分${s}秒`;
+}
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function mk(id) { const c = echarts.init(document.getElementById(id)); charts.push(c); return c; }
 function delta(cur, prev, unit = "") {
@@ -731,7 +738,7 @@ function renderLive() {
     kpis.innerHTML = [
       ["场次", arr.length + " 场"],
       ["平均 UV", fmt(Math.round(avg("uv")))],
-      ["平均观看时长", avg("avgMin").toFixed(1) + " 分钟"],
+      ["平均观看时长", fmtDur(avg("avgMin"))],
       ["平均新增关注", fmt(Math.round(avg("newFollow")))],
     ].map(k => `<div class="card"><div class="kpi"><div class="label">${k[0]}</div><div class="value" style="font-size:24px">${k[1]}</div></div></div>`).join("");
     sec.appendChild(kpis);
@@ -743,14 +750,14 @@ function renderLive() {
     sec.appendChild(c1);
     const c2 = document.createElement("div");
     c2.className = "card";
-    c2.innerHTML = `<h3>平均观看时长趋势（分钟）</h3><div id="live-dur-${uid}" class="chart"></div>`;
+    c2.innerHTML = `<h3>平均观看时长趋势（分·秒）</h3><div id="live-dur-${uid}" class="chart"></div>`;
     sec.appendChild(c2);
     const c3 = document.createElement("div");
     c3.className = "card";
     const last10 = arr.slice(-10).reverse();
     c3.innerHTML = `<h3>最近 10 场明细</h3><table class="data">
       <tr><th>日期</th><th>主题</th><th>UV</th><th>平均观看时长</th><th>新增关注</th></tr>
-      ${last10.map(l => `<tr><td>${l.date}</td><td class="title-cell" title="${l.title}">${l.title}</td><td>${fmtFull(l.uv)}</td><td>${l.avgMin !== null ? l.avgMin + " 分钟" : "—"}</td><td>${fmtFull(l.newFollow)}</td></tr>`).join("")}
+      ${last10.map(l => `<tr><td>${l.date}</td><td class="title-cell" title="${l.title}">${l.title}</td><td>${fmtFull(l.uv)}</td><td>${l.avgMin !== null ? fmtDur(l.avgMin) : "—"}</td><td>${fmtFull(l.newFollow)}</td></tr>`).join("")}
     </table>`;
     sec.appendChild(c3);
     box.appendChild(sec);
@@ -768,14 +775,15 @@ function renderLive() {
         { type: "value", axisLabel: { fontSize: 11, color: "#8a8a82" }, splitLine: { show: false } },
       ],
       series: [
-        { name: "UV", type: "bar", data: arr.map(l => l.uv), itemStyle: { color: COLORS_L[acc], borderRadius: [3, 3, 0, 0] } },
+        { name: "UV", type: "bar", data: arr.map(l => l.uv), itemStyle: { color: COLORS_L[acc], borderRadius: [3, 3, 0, 0] },
+          label: { show: true, position: "top", fontSize: 10, fontWeight: 600, color: "#6a6a62", formatter: p => fmtFull(p.value) } },
         { name: "新增关注", type: "line", yAxisIndex: 1, data: arr.map(l => l.newFollow), itemStyle: { color: COLORS[acc] }, lineStyle: { width: 2 }, smooth: true },
       ],
     });
     mk(`live-dur-${uid}`).setOption({
       tooltip: { ...tooltipBox, formatter: ps => {
         const l = arr[ps[0].dataIndex];
-        return `${l.date} ${l.title}<br>平均观看时长：${l.avgMin} 分钟`;
+        return `${l.date} ${l.title}<br>平均观看时长：${fmtDur(l.avgMin)}`;
       }},
       ...baseAxis(labels, arr.length > 12),
       series: [{ type: "line", data: arr.map(l => l.avgMin), smooth: true, symbol: "circle", symbolSize: 5,
