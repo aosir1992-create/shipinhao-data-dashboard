@@ -200,7 +200,7 @@
   </section>
 </div>
 
-<script src="data.js?v=20260901"></script>
+<script src="data.js?v=20260901a"></script>
 <script>
 const D = window.DASHBOARD_DATA;
 const COLORS = { "经纪号": "#4a7fa5", "团险号": "#5a9a8b", "算盘侠": "#c08a52" };
@@ -544,12 +544,12 @@ function renderMonthlyPlay(acc) {
     tooltip: tooltipBox,
     ...baseAxis(rows.map(r => r.ym), false),
     xAxis: { type: "category", data: rows.map(r => r.ym), axisLabel: { fontSize: 14, fontWeight: 600, color: "#6a6a62" }, axisLine: { lineStyle: { color: "#d8d8d0" } }, axisTick: { show: false } },
-    yAxis: { type: "value", axisSize: 13, axisLabel: { fontSize: 13, color: "#8a8a82", formatter: v => fmt(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
+    yAxis: { type: "value", axisSize: 13, axisLabel: { fontSize: 13, color: "#8a8a82", formatter: v => fmtFull(v) }, splitLine: { lineStyle: { color: "#efefea" } } },
     grid: { left: 80, right: 24, top: 46, bottom: 36 },
     series: [{ type: "line", data: rows.map(r => r.avg), smooth: true, symbol: "circle", symbolSize: 7,
       itemStyle: { color: COLORS[acc] }, lineStyle: { width: 3, color: COLORS[acc] },
       areaStyle: { color: COLORS[acc], opacity: 0.08 },
-      label: { show: true, fontSize: 15, fontWeight: 700, color: "#4c4c45", formatter: p => fmt(p.value) } }],
+      label: { show: true, fontSize: 15, fontWeight: 700, color: "#4c4c45", formatter: p => fmtFull(p.value) } }],
   });
 }
 
@@ -713,12 +713,11 @@ function renderHot() {
   if (!box.innerHTML) box.innerHTML = '<div class="card"><div class="note">暂无爆款数据</div></div>';
 }
 
-/* ================= 直播：按账号分区（近一年） ================= */
+/* ================= 直播：按账号分区（2026 年） ================= */
 function renderLive() {
   const box = document.getElementById("page-live");
   box.innerHTML = "";
-  const latest = D.lives[D.lives.length - 1].date;
-  const yrStart = (parseInt(latest.slice(0, 4)) - 1) + latest.slice(4);
+  const yrStart = "2026-01-01";
   const liveAccounts = ["经纪号", "团险号"];
 
   liveAccounts.forEach(acc => {
@@ -726,7 +725,7 @@ function renderLive() {
     if (!arr.length) return;
     const avg = k => arr.reduce((s, x) => s + (x[k] || 0), 0) / arr.length;
     const sec = document.createElement("div");
-    sec.innerHTML = `<div class="section-title"><span class="dot" style="background:${COLORS[acc]};margin-right:6px"></span>${acc}直播（近一年 · ${arr.length} 场）</div>`;
+    sec.innerHTML = `<div class="section-title"><span class="dot" style="background:${COLORS[acc]};margin-right:6px"></span>${acc}直播（2026 年 · ${arr.length} 场）</div>`;
     const kpis = document.createElement("div");
     kpis.className = "live-kpis";
     kpis.innerHTML = [
