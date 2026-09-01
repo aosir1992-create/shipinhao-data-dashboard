@@ -200,7 +200,7 @@
   </section>
 </div>
 
-<script src="data.js?v=20260901b"></script>
+<script src="data.js?v=202609011417b"></script>
 <script>
 const D = window.DASHBOARD_DATA;
 const COLORS = { "经纪号": "#4a7fa5", "团险号": "#5a9a8b", "算盘侠": "#c08a52" };
@@ -278,7 +278,7 @@ function renderOverview() {
           <div class="kpi"><div class="label">本月净增关注</div><div class="value">${fmt(o.monthNet)}</div><div class="sub">${o.lastMonthFollowYm || ""} 完整月：${fmt(o.lastMonthFollow)}</div></div>
           <div class="kpi"><div class="label">近 7 天日均播放</div><div class="value">${fmt(o.avgPlay7d)}</div><div class="sub">${delta(o.avgPlay7d, o.avgPlayPrev7d)}</div></div>
           <div class="kpi"><div class="label">2026 累计播放</div><div class="value small">${fmt(o.ytdPlay)}</div><div class="sub">近 30 天日均 ${fmt(o.avgPlay30d)}</div></div>
-          <div class="kpi"><div class="label">近一年直播场次</div><div class="value small">${o.liveCountYear} 场</div><div class="sub">&nbsp;</div></div>
+          <div class="kpi"><div class="label">2026 直播场次</div><div class="value small">${o.liveCountYear} 场</div><div class="sub">&nbsp;</div></div>
           <div class="kpi"><div class="label">本周发布视频</div><div class="value small">${(D.videoDetails[acc] || []).length} 条</div><div class="sub">详见单周数据页</div></div>
         </div>
         <div class="goal-block">
